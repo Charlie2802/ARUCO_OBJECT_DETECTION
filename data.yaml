@@ -1,0 +1,13 @@
+train: ../train/images
+val: ../valid/images
+test: ../test/images
+
+nc: 1
+names: ['aruco']
+
+roboflow:
+  workspace: nirma-university-55got
+  project: aruco-markers-2
+  version: 2
+  license: CC BY 4.0
+  url: https://universe.roboflow.com/nirma-university-55got/aruco-markers-2/dataset/2

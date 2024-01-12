@@ -1,0 +1,8 @@
+
+path: '/Users/aaditya/Desktop/aruco-markers-2-3' # dataset root dir
+train: train  # train images (relative to 'path')
+val: valid  # val images (relative to 'path')
+# Classes
+names:
+  0: aruco
+  1: nothing
