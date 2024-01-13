@@ -1,0 +1,59 @@
+import cv2
+from ultralytics import YOLO
+
+yolo_model = YOLO('/Users/aaditya/Desktop/aruco-markers-2-4/runs/detect/train3/weights/best.pt')
+img1_path = '/Users/aaditya/Desktop/aruco-markers-2-4/train/images/aruco_3.jpg'
+results = yolo_model(img1_path)
+
+for result in results:
+    boxes = result.boxes
+    c = boxes.xyxy
+
+if len(c) > 0:
+    c = boxes.xyxy
+    bbox = c.numpy()
+    bbox = bbox.tolist()[0]
+    x_min, y_min, x_max, y_max = map(int, bbox[:4])
+    
+
+    img1 = cv2.imread(img1_path, cv2.IMREAD_GRAYSCALE)
+    roi1 = img1[y_min:y_max, x_min:x_max]
+    img2_path = '/Users/aaditya/Desktop/aruco-markers-2-4/train/images/aruco_3_1.jpg'
+    img2 = cv2.imread(img2_path, cv2.IMREAD_GRAYSCALE)
+
+    # Use the ORB (Oriented FAST and Rotated BRIEF) detector and descriptor
+    orb = cv2.ORB_create()
+    kp1, des1 = orb.detectAndCompute(roi1, None)
+    kp2, des2 = orb.detectAndCompute(img2, None)
+
+    # Create a Brute Force Matcher object
+    bf = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=True)
+
+    # Match descriptors
+    matches = bf.match(des1, des2)
+    matches = sorted(matches, key=lambda x: x.distance)
+
+    # Adjust and convert the coordinates back to DMatch format
+    adjusted_matches = []
+    for mat in matches:
+        img1_idx = mat.queryIdx
+        x1, y1 = kp1[img1_idx].pt
+        x1 = int(x1 + x_min)
+        y1 = int(y1 + y_min)
+        img2_idx = mat.trainIdx
+        x2, y2 = kp2[img2_idx].pt
+        adjusted_matches.append(cv2.DMatch(_queryIdx=img1_idx, _trainIdx=img2_idx, _distance=mat.distance))
+
+        # Print the adjusted coordinates
+        print(f"Adjusted Match at: ({x1}, {y1}) -> ({x2}, {y2})")
+
+    # Draw the matches on the images
+    img_matches = cv2.drawMatches(img1, kp1, img2, kp2, adjusted_matches[:10], None,
+                                  flags=cv2.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS)
+    
+    # Display the result
+    cv2.imshow('Feature Matches', img_matches)
+    cv2.waitKey(0)
+    cv2.destroyAllWindows()
+else:
+    print("No detection in the first image.")
