@@ -1,0 +1,75 @@
+import cv2
+import glob
+from ultralytics import YOLO
+
+# Initialize YOLO model
+model = YOLO('/Users/aaditya/Desktop/aruco-markers-2-4/runs/detect/train3/weights/best.pt')
+
+# Path to the image folder
+image_folder = "/Users/aaditya/Desktop/IMAGES/*jpg"
+
+# Loop through all images in the folder
+for img_path in glob.glob(image_folder):
+    # Read the image
+    cv_img = cv2.imread(img_path)
+
+    # Run YOLO model on the current image
+    results = model(img_path)
+
+    # Check if there is any detection in the current image
+    for result in results:
+        boxes = result.boxes
+        c = boxes.xyxy
+
+        if len(c) > 0:
+            print(f"Detected objects in {img_path}")
+
+            # Extract bounding box coordinates from YOLO results
+            bbox = c[0].numpy().tolist()
+            x_min, y_min, x_max, y_max = map(int, bbox[:4])
+
+            # Crop the image based on the bounding box
+            roi = cv_img[y_min:y_max, x_min:x_max]
+
+            # Load the reference image for feature matching
+            reference_img_path = '/Users/aaditya/Desktop/aruco-markers-2-4/train/images/aruco_3_1.jpg'
+            reference_img = cv2.imread(reference_img_path, cv2.IMREAD_GRAYSCALE)
+
+            # Use the ORB (Oriented FAST and Rotated BRIEF) detector and descriptor
+            orb = cv2.ORB_create()
+            kp1, des1 = orb.detectAndCompute(roi, None)
+            kp2, des2 = orb.detectAndCompute(reference_img, None)
+
+            # Create a Brute Force Matcher object
+            bf = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=True)
+
+            # Match descriptors
+            matches = bf.match(des1, des2)
+            matches = sorted(matches, key=lambda x: x.distance)
+
+            # Adjust and convert the coordinates back to DMatch format
+            adjusted_matches = []
+            for mat in matches:
+                img1_idx = mat.queryIdx
+                x1, y1 = kp1[img1_idx].pt
+                x1 = int(x1 + x_min)
+                y1 = int(y1 + y_min)
+                kp1[img1_idx].pt = (x1, y1)
+                mat.queryIdx = img1_idx
+
+                img2_idx = mat.trainIdx
+                adjusted_matches.append(cv2.DMatch(_queryIdx=img1_idx, _trainIdx=img2_idx, _distance=mat.distance))
+                # Print the adjusted coordinates
+                #print(f"Adjusted Match at: ({x1}, {y1})")
+
+            # Draw the matches on the images using adjusted coordinates
+            img_matches = cv2.drawMatches(roi, kp1, reference_img, kp2, adjusted_matches[:10], None,
+                                          flags=cv2.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS)
+
+            # Display the result for each image
+            cv2.imshow('Feature Matches', img_matches)
+            cv2.waitKey(0)
+            cv2.destroyAllWindows()
+
+        else:
+            print(f"No detection in {img_path}")
